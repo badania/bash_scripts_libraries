@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+
+# Requires at least bash 3.1. As it makes extensive use of arrays, it would be a pain to 
+# try to write it to be sh compatible, but it may be possible.
+
+#########
+
+clear
+# store value of nocasematch
+old_shopt="$(shopt -p nocasematch)"
+
+# arrays for questions and answers
+codenames=("Warty Wharthog" "Hoary Hedgehog" "Breezy Badger" "Dapper Drake" "Edgy Eft" "Feisty Fawn" 
+"Gutsy Gibbon" "Hardy Heron" "Intrepid Ibex" "Jaunty Jackalope" "Karmic Koala" "Lucid Lynx" "Maverick Meerkat" 
+"Natty Narwahl" "Oneric Ocelot" "Precise Pangolin" "Quantal Quentzal" "Raring Ringtail" "Saucy Salamander")
+versions=(4.10 5.04 5.10 6.06 6.10 7.04 7.10 8.04 8.10 9.04 9.10 10.04 10.10 
+11.04 11.10 12.04 12.10 13.04 13.10)
+
+# must intialize quest_index at -1 so we can use array index 0
+quest_index=-1
+target_questions=19
+# we start question counter at 0, so we can increment it to the value in number_questions
+questions=0 
+# the other variables below will all be incremented as necessary in the quiz
+correct=0 
+wrong=0
+no_response=0
+pass=0
+
+# declare questions_order array and then shuffle it and use that for this run of the script.
+# must be declared outside of the loop, as only want it executed once
+questions_order=(15 4 1 10 8 3 13 0 11 16 2 7 5 17 6 9 14 18 12)
+shuffled_order=( $(shuf -n19 -e ${questions_order[@]}) )
+
+printf "\nPress 0 to exit the quiz at any time.\n"
+printf "You can ignore case in your answers, but correct spelling of the Ubuntu codenames is crucial.\n"
+printf "Please enter the word pass if you don't know the answer.\n\n\n"
+
+
+timer_begin=$SECONDS
+
+
+until (( questions == target_questions )); do
+ 
+(( questions++ ))
+
+(( quest_index++ ))
+
+# each time the loop runs, we get a new question by incrementing quest_index each time and the array index
+# (e.g. 1) of quest_index refers to the array index of shuffled_order, which itself has been created earlier (outside
+# of the loop by shuffling questions_order. Then we use new_index in the codenames and versions arrays in the
+# conditional further below so that both arrays use the same value (e.g. 1) and so the questions and answers
+# match up. 
+new_index=$( echo ${shuffled_order[$quest_index]})
+
+# alternate style of questions, separate odd and even 
+
+    if (( questions % 2 > 0 )); then 
+        new_question="${codenames[$new_index]}"
+        ans="${versions[$new_index]}"
+        question_text="Ubuntu release had the development codename"
+    else
+        new_question="${versions[$new_index]}"
+        ans="${codenames[$new_index]}"
+        question_text="was the Ubuntu development codename (both adjective and animal) for release"
+    fi
+
+read -p "(${questions}) What ${question_text} ${new_question}? " response 
+
+# necessary to switch on nocasematch to cover if the answer is in capitals, as can't use normal [Mm] in case statement
+shopt -s nocasematch
+
+# if the case statement gets any bigger, all the conditionals should probably go in separate functions
+
+    case $response in 
+    "$ans") 
+          printf "Well done, correct answer. " 
+          (( correct++ ))
+          if (( questions < target_questions )); then 
+              printf "Next question.\n\n" 
+          else
+              printf "\nHowever, the quiz has now finished. Let us calculate your performance...\n"
+              sleep 1
+          fi
+       ;; 
+       0) 
+          printf "\nOk, time to finish with the quiz.\n"
+          break
+       ;;
+    "pass")
+         (( pass++ ))
+         printf "Ok, you passed on this one..."
+         if (( pass >= 10 )); then 
+            printf "The passes are mounting, as you have now had ${pass} passes.\n"
+         elif (( pass >= 2 )); then
+            printf "Please try to give an answer, as you have now had ${pass} passes.\n" 
+         fi
+            
+         if (( questions < target_questions )); then 
+            printf "Let us try another question.\n\n"
+         else
+            printf "\nHowever, the quiz has now finished. Let us calculate your performance.....\n"
+            sleep 1
+         fi
+         
+       ;;
+       *) 
+          if [[ -z ${response} ]]; then
+              printf "Please provide an answer, as a blank answer is counted as a wrong answer; "
+              (( no_response++ ))
+              (( wrong++ ))
+                if (( no_response == 1  )); then
+                    printf "${no_response} blank response has been given so far. \n"
+                elif (( no_response > 1 )); then
+                    printf "${no_response} blank responses have been given so far. \n"   
+                fi
+          else
+              (( wrong++ ))
+                if  (( questions % 2 > 0 )); then
+                    printf "That is incorrect..."
+                else 
+                    printf "That is incorrect, ${response} was not the codename of ${new_question}. \n"
+                fi
+          fi
+           
+         if (( questions < target_questions )); then 
+            printf "Let us try another question.\n\n"
+         else
+            printf "\nHowever, the quiz has now finished. Let us calculate your performance.....\n"
+            sleep 1
+         fi
+       ;;
+    esac
+
+done
+
+
+
+quiz_duration=$(( SECONDS - timer_begin ))
+# could further process the $quiz_duration if it is over 60 seconds, and output the total in
+# minutes and seconds using bc or awk
+
+# restore nocasematch original value, don't quote or will experience error
+$old_shopt
+
+# checking against target_questions here, i.e. all of the questions
+if (( questions == target_questions )); then 
+    if (( correct == target_questions )); then
+        printf "\nYou got them all right in ${quiz_duration} seconds, well done!\n\n"
+    elif (( no_response == target_questions )); then 
+        printf "\nYou gave ${no_response} blank responses, and so effectively gave ${no_response} wrong answers.\n\n"                
+    elif (( wrong == target_questions )); then
+        printf "\nYou got them all wrong in ${quiz_duration} seconds, oh dear!\n\n"
+    elif (( pass == target_questions )); then 
+        printf "\nYou passed on all the questions. Was this just a trial run?\n\n"             
+    else
+        printf "\nOut of ${target_questions} questions, you got "
+        # have to do this now because we have added the pass option, as you can have none wrong/correct,
+        # some correct/wrong, and some passes
+        (( wrong > 0 )) && printf "${wrong} wrong and "
+        (( correct > 0 )) && printf "${correct} correct "
+        
+        if (( pass == 0 )); then
+            printf "with no passess at all in a time of ${quiz_duration} seconds.\n "
+        elif (( pass == 1 )); then 
+            printf "with 1 pass in a time of ${quiz_duration} seconds.\n "
+        elif (( pass > 1 )); then
+            printf "with ${pass} passes in a time of ${quiz_duration} seconds.\n"
+        fi
+    fi
+fi
+exit $?
+
+
+
+

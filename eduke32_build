@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+duke_dir="$HOME/src/eduke32"
+
+# check dependencies are installed
+# dependencies are listed at http://wiki.eduke32.com/wiki/Building_EDuke32_on_Linux
+
+dependencies_check() {
+
+    local installed=()
+    local to_be_installed=()
+    local dependencies_list=(build-essential nasm libgl1-mesa-dev libglu1-mesa-dev subversion 
+    libsdl1.2-dev libsdl-mixer1.2-dev libvorbis-dev libpng12-dev libvpx-dev libgtk2.0-dev freepats)    
+    
+    for package in "${dependencies_list[@]}"; do 
+        if grep -iq '^ii' < <(dpkg -l "$package"); then
+            installed+=("$package")
+        else 
+            to_be_installed+=("$package")
+        fi
+    done
+
+    if (( ${#to_be_installed[@]} != 0 )); then
+        printf "If you have recently elevated your privileges with sudo, you will not see a " 
+        printf "prompt here, before the apt-get update and removal of packages occurs.\n" 
+        sleep 2
+        sudo -p "We need to install some dependencies, please enter ypur password: " 
+        apt-get update && sudo apt-get -y install "${to_be_installed[@]}"
+        return 0
+    else 
+        printf "Nothing to install, proceeding\n"
+        return 0
+    fi
+
+}
+
+printf "Lets first check to see if the dependencies are installed\n"
+dependencies_check && printf "Now to download and build the latest version\n"
+
+if [[ -d $HOME/src ]]; then 
+    cd $HOME/src || exit 1
+else
+    mkdir $HOME/src && cd $HOME/src
+fi
+
+[[ -d $duke_dir ]] && rm -rf "$duke_dir" 
+
+svn checkout http://svn.eduke32.com/eduke32/polymer/ eduke32 || exit 1
+# have already cddded to $HOME/src
+cd ./eduke32/eduke32 || exit 1
+make && printf "Build finished successfully\n" || exit 1
+sudo -p "Please provide your password to install the programs: " cp eduke32 mapster32 /usr/local/bin 
+
+exit $?

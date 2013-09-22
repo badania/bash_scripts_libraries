@@ -1,0 +1,661 @@
+#!/usr/bin/env bash
+
+# This file MUST be sourced rather than executed, and should NOT be made executable
+
+# There is a much more sophisticated way of doing a table of contents, but I haven't implemented it yet.
+# To list contents: declare -f | grep -C 2 mik or mikfunctionslist
+# To append a new table of contents,run mikupdatefunctions
+
+# Contents:
+
+# 1     mikaddshebang()
+# 2     mikanyplay()
+# 3     mikanyplay2()
+# 4     mikburn()
+# 5     mikburn2()
+# 6     mikburniso()
+# 7     mikchangeshebang()
+# 8     mikcomment()
+# 9     mikconfig()
+# 10    mikcount()
+# 11    mikcurr()
+# 12    mikdos2unix()
+# 13    miketcbackup()
+# 14    miketcbackup2()
+# 15    mikextremove()
+# 16    mikfindallprogs()
+# 17    mikfinddoc()
+# 18    mikfindeb()
+# 19    mikfindtar()
+# 20    mikfunctionslist()
+# 21    mikfuseoff()
+# 22    mikfuseon()
+# 23    mikgdb()
+# 24    mikhistory()
+# 25    mikiplayer()
+# 26    mikiplayer2()
+# 27    mikiplayer3()
+# 28    mikiplayer4()
+# 29    mikiso()
+# 30    mikkey()
+# 31    mikkeyadd()
+# 32    miklist()
+# 33    miklower()
+# 34    mikltrace()
+# 35    mikltrace2()
+# 36    mikman()
+# 37    mikmass_symlink()
+# 38    mikmodules()
+# 39    mikrip()
+# 40    mikrmspace()
+# 41    mikrpass()
+# 42    mikscreenignore()
+# 43    miksedemail()
+# 44    miksedip()
+# 45    mikstrace()
+# 46    mikstrace2()
+# 47    mikstrace3()
+# 48    mikstrace4()
+# 49    miktabdel()
+# 50    miktop10size()
+# 51    miktype()
+# 52    mikudev()
+# 53    mikudevdrivers()
+# 54    mikuncomment()
+# 55    mikupdatefunctions()
+# 56    mikverify()
+
+#####################################All functions (that are not in script form)##########################################
+
+# unless stated, these functions are of my own invention
+# some of them may not be generally useful and are specific to me
+
+
+# list top 10 file/dir sizes
+miktop10size() { 
+    
+    (( $# == 1 )) || { printf "Usage: please provide the name of a valid directory.\n" >&2; return 1; }
+    
+    if [[ ! -d $1 ]]; then
+        printf "Directory not found. Please enter the full path for $1 or " >&2
+        printf "run the function again with a valid directory.\n" >&2
+        return 1
+    else 
+        # use subshell so terminal stays in current dir 
+        # command adapted from Steve Parker, Shell Scripting
+        ( cd "$1" && printf "The top ten largest files or directories in $1 are: \n\n%s\n" "$(du -sh * | sort -hr | head | cat -n -)" ) || return 1
+    fi
+        
+}
+
+# search all my various history files from all my usage of Linux (since July 2012)
+mikhistory() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a 'search term' inside single quotes.\n" >&2; return 1; }
+    
+    grep -rin "$1" $HOME/{.bash_history,.bash_history.archive,.command_log} | cut -d: -f3-4 || return 1
+    
+}
+
+# comment out a file
+mikcomment() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify valid file.\n" >&2; return 1; }
+    
+    sed -i 's/^/#/' "$1" || return 1
+    
+}
+
+# uncomment a file
+mikuncomment() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid file.\n" >&2; return 1; }
+    
+    sed -i 's/^#//' "$1" || return 1
+    
+}
+
+# see words appear on screen as if they were typed by you
+miktype() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid string.\n" >&2; return 1; }
+    
+    echo "$1" | pv -qL 10 || return 1
+}
+
+# rip cds
+mikrip() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid drive.\n" >&2; return 1; }
+    
+    { [[ -d $HOME/Music/Recently_added ]] && ripit -eject -d "$1" -coder 1 -q 8 -o /home/mike/Music/Recently_added; } || return 1
+    
+}
+
+# udev list attributes of device "$1" specified
+mikudev() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid device.\n" >&2; return 1; }
+    
+    udevadm info --name="$1" --attribute-walk || return 1
+}
+
+# udev list drivers/modules used of device
+
+mikudevdrivers() {
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid device.\n" >&2; return 1; }
+    
+    printf "Your device on $1 uses these drivers/modules:\n%s\n" "$(udevadm info --name="$1" --attribute-walk | \
+    grep -i driver[s] | cut -d= -f3- | grep '[[:alnum:]]' | tr -d '""')" 
+    
+    
+}
+
+# functions to investigate kernel modules and config
+# adapted from a command I found, but cannot remember the source, so credit there
+mikmodules() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid search term, quoted.\n" >&2; return 1; }
+    
+    find /lib/modules/$(uname -r)/kernel -type f -iname '*.ko' -print | sort | grep -i -C 4 "$1" || return 1
+
+}
+
+
+mikconfig() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify a valid search term, quoted.\n" >&2; return 1; }
+    
+    grep -i -C 4 "$1" /boot/config-$(uname -r) || return 1
+
+}
+
+# currency function from http://segfault.in/2010/03/command-line-currency-converter-for-linux
+mikcurr() { 
+    
+    (( $# == 3 )) || { printf "Usage: please specify the amount and the currency to convert from and to.\n" >&2; return 1; }
+    
+    wget -qO- "http://www.google.com/finance/converter?a=$1&from=$2&to=$3" |  sed '/res/!d;s/<[^>]*>//g' || return 1
+
+}
+
+# gpg verify functions; $1 is sig or asc file; $2 is tar.gz or whatever
+mikverify() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify sig/asc file and tar.gz,etc in that order.\n" >&2; return 1; }
+    
+    gpg --verify "$1" "$2" || return 1
+    
+}
+
+# add gpg keys
+mikkey() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify key.\n" >&2; return 1; }
+    
+    gpg --recv-keys "$1" || return 1
+    
+}
+
+# pdf manpage; $1 is the name of the program, e.g. find and so needs to be $1 throughout
+# I adapted this command from one I found
+mikman() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify program.\n" >&2; return 1; }
+    
+    man -t "$1" | ps2pdf - "$1".pdf && setsid evince "$1".pdf || return 1
+    
+}
+
+# find stats on folders, or hierarchies
+miklist() { 
+    (( $# == 1 )) || { printf "Usage: please specify folder.\n" >&2 && return 1; }
+    
+    # unfortunately can't split up this line using \
+    
+    printf "Directory: $1\nRegular Files: %s\nSymlinks: %s\nTotal Files: %s\nDirectories: %s\nSize: %s\n" "$(find $1 -type f | wc -l)" "$(find $1 -type l | wc -l )" "$(( $(find $1 | wc -l) - $(find $1 -type d | wc -l) ))" "$(find $1 -type d | wc -l)" "$(du -sh $1 | cut -f1)" || return 1
+    
+}
+
+# iplayer
+# see my script for livetv watching and recording
+# download recorded tv progs
+mikiplayer() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify prog number.\n" >&2; return 1; }
+    
+    get_iplayer "$1" --modes=best --get || return 1
+    
+}
+
+# stream recorded tv programmes (not live)
+mikiplayer2() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify stream number.\n" >&2; return 1; }
+    
+    get_iplayer --modes=best --stream "$1" --player="vlc - " || return 1
+
+}
+
+# $1 is number of program
+mikiplayer3() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify stream number.\n" >&2; return 1; }
+    
+    get_iplayer --type=liveradio --modes=best --stream "$1" | tee "$1".m4a | vlc - || return 1
+    
+}
+
+mikiplayer4() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify stream number.\n" >&2; return 1; }
+    
+    get_iplayer --type=liveradio --modes=best --get "$1" || return 1
+
+}
+ 
+# stream and download program, specific to itvplayer, but get_flash_videos works with many sites
+# if your connection is slow, vlc may run out of data to stream
+
+mikanyplay2() {
+    
+   (( $# == 1 )) || { printf "Usage: please specify url.\n" >&2; return 1; }
+    
+    # the command sub after -f creates a unique file with the date and the name of the program
+    # as taken from $1. Then in another command sub, the ${1:30} strips the first 30 chars off the start
+    # which is https://www.itv.com/itvplayer/ then the slashes are replaced with underscore by tr 
+    get_flash_videos "$1" -p --player=vlc -f "$(date +%F_%H_%M_%S)_$( echo ${1:30} | tr -s '/' _ ).flv" || return 1 
+
+}
+
+# other tv, this one specifically for itvplayer, just downloads the specified program, 
+
+mikanyplay() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify url.\n" >&2; return 1; }
+    
+    # the command sub after -f creates a unique file with the date and the name of the program
+    # as taken from $1. Then in another command sub, the ${1:30} strips the first 30 chars off the start
+    # which is https://www.itv.com/itvplayer/ then the slashes are replaced with underscore by tr 
+    get_flash_videos "$1" -f "$(date +%F_%H_%M_%S)_$( echo ${1:30} | tr -s '/' _ ).flv" || return 1
+    
+}
+
+# function to create iso from single folder where $1 is label, $2 is iso name, $3 is folder. 
+# Multiple folders can be specified, and -graft-points can be used /folder/=/location/of/folder. Do this manually.
+mikiso() { 
+    
+    (( $# == 3 )) || { printf "Usage: please specifylabel, iso name, and folder in that order.\n" >&2; return 1; }
+    
+    genisoimage -r -J -T -V "$1" -o "$2".iso "$3" || return 1
+
+}
+
+# function to burn iso 
+mikburniso() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify device and iso location in that order.\n" >&2; return 1; }
+    
+    wodim -eject -tao dev="$1" -v -data "$2"
+    
+}
+
+# function to burn iso or folder containing files 
+mikburn() { 
+    
+    (( $# == 3 )) || { printf "Usage: please specify device, volume name and single folder in that order.\n" >&2; return 1; }
+    
+    growisofs -dvd-compat -Z "$1" -speed=1 -r -J -T -V "$2" "$3" || return 1
+
+}
+# To keep folder structure use -graft-points /folder/=/location/of/folder for each if specifying multiple folders
+# sometimes -joliet-long may be necessary to force a burn
+# example: growisofs -dvd-compat -Z /dev/sr1 -speed=1 -r -J -T -V Apr13 -graft-points /bin/=/home/mike/bin
+
+# function to burn straight from preprepared iso; $1 is device and $2 is iso name and location
+mikburn2() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify device and iso path in that order.\n" >&2; return 1; }
+    
+    growisofs -dvd-compat -Z "$1"="$2" || return 1
+    
+}
+ 
+# function to get gpg key
+mikkeyadd() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify website.\n" >&2; return 1; }
+    
+    wget "$1" -0- | sudo apt-key add - || return 1
+    
+}
+
+# function to make random password
+# credit to the inventor of this one, can't remember the source
+mikrpass() { 
+    
+    cat /dev/urandom | tr -cd '[:graph:]' | head -c ${1:-12} 
+
+}
+
+# function to fusemount, where $1 is location of iso
+mikfuseon() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify location of iso and name of mount (ending in .mount).\n" >&2; return 1; }
+       
+    fuseiso -n -p "$1" "$2" || return 1
+
+}
+
+# function to unmount a fuser mounted volume; $1 is name of mount; e.g. mik.mount
+mikfuseoff() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify name of mount).\n" >&2; return 1; }
+    
+    fusermount -u "$1" || return 1
+
+}
+
+
+#####for find commands, specify absolute path and backslash the glob when using it as argument to function###########
+
+# find and remove spaces in files and sub with _ # can also use mv -- "${file}" "$( echo "${file}" | tr -s ' ' _)"
+# non-recursive version
+
+mikrmspace() { 
+    
+    (( $# == 1 )) || { printf "Usage: please enter the folder name\n" >&2; return 1; }
+    
+    for file in "$1"/*; do 
+        mv -- "${file}" "${file// /_}"
+    done 
+    
+}
+
+# find and tar files- inspired by a source I cannot remember
+mikfindtar() { 
+    
+    (( $# == 3 )) || { printf "Usage: please specify location, files (escape the glob), and name of tar volume to be created in that order.\n" >&2; return 1; }
+    
+    find "$1" -type f -iname "$2" -print0 | tar --null -cv -T - -f "$3" || return 1
+
+}
+
+# lowercase files; non-recursive. Alternatvely, use mv -- "${file}" "$(echo "${file}" | tr '[:upper:]' '[:lower:]')"
+miklower() { 
+    
+    (( $# == 1 )) || { printf "Usage: please give name of folder\n" >&2; return 1; }
+    
+   
+    for file in "$1"/*; do 
+        mv -- "${file}" "${file,,}"
+    done 
+    
+}
+
+# convert to unix line-ending format-probably could use the real dos2unix app!!
+mikdos2unix() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify location and type of files.\n" >&2; return 1; }
+    
+    find "$1" -type f -name "$2" -print0 | \
+    while IFS= read -r -d '' file ; do 
+        tr -d '\015' < "${file}" > "${file}_$$" && rm -rf "${file}" \
+        && mv -- "${file}_$$" "${file}" 
+    done
+    
+}
+
+# remove all \t (tabs) from docs
+miktabdel() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify location and type of files).\n" >&2; return 1; }
+    
+    find "$1" -type f -name "$2" -print0 | \
+    while IFS= read -r -d '' file ; do 
+        sed -i 's/\t/    /g' "${file}"
+    done
+    
+}
+     
+# find debs in src and place in backup folder
+mikfindeb() { 
+    
+    find /home/mike/src -iname '*.deb' -exec cp '{}' /home/mike/Compiled_backups \;
+    
+}
+
+# backup /etc in secure locations
+# this may not be generally useful
+miketcbackup() { 
+    
+    sudo tar czvf /media/truecrypt6/"etc_backup_$(date +%F_%H_%M_%S).tar.gz" /etc
+    
+}
+
+miketcbackup2() { 
+    
+    sudo tar czvf /root/backups/etc_backups/"etc_backup_$(date +%F_%H_%M_%S).tar.gz" /etc
+
+}
+
+# meta functions data
+# again these functions may not be generally useful for anyone
+
+mikfunctionslist() { 
+    
+    grep -Eo '^[^ #].*\(\)' $HOME/lib/Bash_libraries/mik_bashlib | \
+    sort -u | cat -n | tr -d ' ' | sed -e 's/^/# /'
+    
+}
+
+mikupdatefunctions() { 
+    
+    grep -Eo '^[^ #].*\(\)' < $HOME/lib/Bash_libraries/mik_bashlib | \
+    sort -u | cat -n | tr -d ' ' | sed -e 's/^/# /' >> $HOME/lib/Bash_libraries/mik_bashlib
+    
+}
+
+# sed functions
+
+# extract email addresses from file/s
+# there are better ways, but this is just a quick variation on a way to do it
+
+miksedemail() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify file.\n" >&2; return 1; }
+    
+    sed -n '/[[:alnum:]]*@[[:alnum:]]*/p' "$1" || return 1
+    
+}
+
+# remove extension
+
+mikextremove() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify location and names of files \n" >&2; return 1; }
+    
+    find "$1" -type f -name "$2" -print0 | \
+    while IFS= read -r -d '' file; do 
+        mv "${file}" "${file%.*}"
+    done
+    
+}
+    
+
+# again, better ways to do this, but I'll leave this here as an early example of my experiments
+miksedip() { 
+    
+    (( $# == 1 )) 
+    
+    sed -n '/[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*/p' "$1" || return 1
+    
+}
+
+# count lines and words in a file
+# this may have been inspired by someone else's command, I cannot remember the source
+
+mikcount() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify file.\n" >&2; return 1; }
+    
+    awk '{ total = total + NF }; END { printf("Word Count: %s\n", total+0) }; END { printf("Number of Lines: %s\n", NR) }' "$1"
+
+}
+
+# change bin/bash to /usr/bin/env bash
+# change -n to -i if want to actually alter files or send to > file
+
+mikchangeshebang() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify file.\n" >&2; return 1; }
+    
+    sed -n 's/\#\!\/bin\/bash/\#\!\/usr\/bin\/env bash/p' "$1" || return 1
+    
+}
+
+mikaddshebang() {
+    
+    (( $# == 1 )) || { printf "Usage: please specify file.\n" >&2; return 1; }
+    
+    sed -n '0,/^$/s//\#\!\/usr\/bin\/env bash/p' "$1" | return 1
+    
+}
+
+mikfindallprogs() {
+    
+#shell scripts (bash and sh)
+
+    echo -n "Now processing....."
+    filesystem_scripts=($(file {/usr,}/{s,}bin/* | grep -Ei 'POSIX|Bourne' | cut -d: -f1))
+    for script in "${filesystem_scripts[@]}"; do 
+        whatis "${script##*/}" 
+    done 2>&1 | sort > "Filesystem_Scripts_$(date +'%F_%H_%M_%S')" 
+
+# everything else 
+
+    other_executable=($(file {/usr,}/{s,}bin/* | cut -d: -f1))
+    for file in "${other_executable[@]}"; do 
+        whatis "${file##*/}" 
+    done 2>&1 | sort > "other_executable_$(date +'%F_%H_%M_%S')" 
+    echo "finished."
+    
+}
+
+# quickly find docs, also see my findreadme script
+
+mikfinddoc() {
+    
+    (( $# == 1 )) || { printf "Usage: please specify a program or package name.\n" >&2; return 1; }
+    # ls /usr/share/doc/bash*/** (if extglob is enabled) would list all the contents of the dirs as well
+    ls /usr/share/doc/"$1"*
+    ls /usr/share/doc/"$1"* | grep -i readme
+    
+    # locate
+    printf "\n\n"
+    printf "Do you need to use locate as well to find the documentation?\n"
+    select answer in "Yes" "No"; do
+        case $answer in
+            Yes) 
+                 sudo -p "Please provide your password to update the database " updatedb || return 1
+                 locate -i "$1" | grep -i 'doc'
+                 return $?; break
+              ;;
+             No) 
+                 return 0; break
+             ;;
+        esac
+    done
+    
+}
+
+# mass symlink creations- manually use -f to force overwrite, but don't use as default
+
+mikmass_symlink() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify path of directory with items and destination dir\n" >&2; return 1; }
+    
+    ( cd "$1" || return 1 
+      for item in ./*; do 
+        ln -s "$1"/"${item}" "$2"/"${item}"
+      done ) 
+      
+}
+
+# function for when your power manager ignores your settings to keep screen alive
+
+mikscreenignore() {
+    
+    while true; do 
+        xdotool mousemove 0 456 click 1 mousemove restore
+        sleep 480 
+    done &
+    
+}
+
+
+####################################################
+
+# Debugging
+
+# these strace functions need two positional parameters if you run say mikstrace evince file.pdf
+mikstrace() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify program and file.\n" >&2; return 1; }
+    
+    strace -f -e trace=open,close "$1" "$2" 2>&1 | tee "$1_$(date +'%F_%H_%M_%S').log" || return 1
+    
+}
+
+mikstrace2() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify program and file.\n" >&2; return 1; }
+    
+    strace -f -e trace=all "$1" "$2" 2>&1 | tee "$1_$(date +'%F_%H_%M_%S').log"
+    
+}
+
+mikstrace3() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify program and file.\n" >&2; return 1; }
+    
+    strace -f -e trace=read,write "$1" "$2" 2>&1 | tee "$1_$(date +'%F_%H_%M_%S').log"
+    
+}
+
+# for the fourth one, to eliminate certain grep search strings run, e.g. grep -Eiv 'ENOENT|icons' | grep /home/mike
+mikstrace4() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify program and file.\n" >&2; return 1; }
+    
+    strace -f -e trace=open "$1" "$2" |& grep $HOME
+    
+}
+
+
+mikltrace() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify file.\n" >&2; return 1; }
+    
+    ltrace -c "$1" "$2" 2>&1 | tee "$1_$(date +'%F_%H_%M_%S').log" || return 1
+    
+}
+
+mikltrace2() { 
+    
+    (( $# == 2 )) || { printf "Usage: please specify program and file.\n" >&2; return 1; }
+    
+    ltrace -f -e "$1" "$2" 2>&1 | tee "$2_$(date +'%F_%H_%M_%S').log" || return 1
+    
+}
+
+mikgdb() { 
+    
+    (( $# == 1 )) || { printf "Usage: please specify program.\n" >&2; return 1; }
+    
+    gdb "$1" 2>&1 | tee $HOME/gdb-"$1_$(date +'%F_%H_%M_%S').log" || return 1
+    
+}
+
+#######################################################
