@@ -36,34 +36,35 @@
 # 26    mikiplayer2()
 # 27    mikiplayer3()
 # 28    mikiplayer4()
-# 29    mikiso()
-# 30    mikkey()
-# 31    mikkeyadd()
-# 32    miklist()
-# 33    miklower()
-# 34    mikltrace()
-# 35    mikltrace2()
-# 36    mikman()
-# 37    mikmass_symlink()
-# 38    mikmodules()
-# 39    mikrip()
-# 40    mikrmspace()
-# 41    mikrpass()
-# 42    mikscreenignore()
-# 43    miksedemail()
-# 44    miksedip()
-# 45    mikstrace()
-# 46    mikstrace2()
-# 47    mikstrace3()
-# 48    mikstrace4()
-# 49    miktabdel()
-# 50    miktop10size()
-# 51    miktype()
-# 52    mikudev()
-# 53    mikudevdrivers()
-# 54    mikuncomment()
-# 55    mikupdatefunctions()
-# 56    mikverify()
+# 29    mikiplayerauto()
+# 30    mikiso()
+# 31    mikkey()
+# 32    mikkeyadd()
+# 33    miklist()
+# 34    miklower()
+# 35    mikltrace()
+# 36    mikltrace2()
+# 37    mikman()
+# 38    mikmass_symlink()
+# 39    mikmodules()
+# 40    mikrip()
+# 41    mikrmspace()
+# 42    mikrpass()
+# 43    mikscreenignore()
+# 44    miksedemail()
+# 45    miksedip()
+# 46    mikstrace()
+# 47    mikstrace2()
+# 48    mikstrace3()
+# 49    mikstrace4()
+# 50    miktabdel()
+# 51    miktop10size()
+# 52    miktype()
+# 53    mikudev()
+# 54    mikudevdrivers()
+# 55    mikuncomment()
+# 56    mikupdatefunctions()
+# 57    mikverify()
 
 #####################################All functions (that are not in script form)##########################################
 
@@ -252,6 +253,34 @@ mikiplayer4() {
     (( $# == 1 )) || { printf "Usage: please specify stream number.\n" >&2; return 1; }
     
     get_iplayer --type=liveradio --modes=best --get "$1" || return 1
+
+}
+
+# find program id and download a single program all in one go
+mikiplayerauto() {
+    
+    (( $# == 1 )) || { printf "Usage: please specify grep search term.\n" >&2; return 1; }
+    
+    # easier than using get_iplayer's built in search feature
+    search_query="$1"
+    shift
+    prog_id=( $(get_iplayer | grep -i "${search_query}" | cut -d: -f1) )
+    num_results="${#prog_id[@]}"
+    # catch if multiple matches found
+    if (( ${num_results} > 1 )); then 
+        printf "There are ${num_results} downloads; this is probably not what you want.\n" >&2
+        printf "Please narrow down your search term to a specific program.\n" >&2
+        return 1
+    fi
+    # check if prog_id is an integer 
+    regex='^[[:digit:]]*$'
+    if [[ ${prog_id[@]} =~ ${regex} ]]; then
+        get_iplayer "${prog_id}" --modes=best --get || { printf "Error, id for ${search_query} is not valid.\n" >&2; return 1; }
+        return 0
+    else
+        printf "Error, numerical program id not found\n" >&2
+        return 1
+    fi
 
 }
  
@@ -531,15 +560,17 @@ mikfindallprogs() {
     filesystem_scripts=($(file {/usr,}/{s,}bin/* | grep -Ei 'POSIX|Bourne' | cut -d: -f1))
     for script in "${filesystem_scripts[@]}"; do 
         whatis "${script##*/}" 
-    done 2>&1 | sort > "Filesystem_Scripts_$(date +'%F_%H_%M_%S')" 
+    done 2>&1 | sort > "Filesystem_Scripts_$(date +'%F_%H_%M_%S')"
+    code1=$? 
 
 # everything else 
 
     other_executable=($(file {/usr,}/{s,}bin/* | cut -d: -f1))
     for file in "${other_executable[@]}"; do 
         whatis "${file##*/}" 
-    done 2>&1 | sort > "other_executable_$(date +'%F_%H_%M_%S')" 
-    echo "finished."
+    done 2>&1 | sort > "other_executable_$(date +'%F_%H_%M_%S')"
+    code2=$? 
+    (( code1 + code2 == 0 )) && echo "Done."
     
 }
 
