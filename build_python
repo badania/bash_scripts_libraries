@@ -171,12 +171,14 @@ else
     printf " have been added to your path just as $HOME/bin is created.\nn"
 fi
 
-# important info re setting up pyenv re distribute tools and pip etc
+# important info re setting up pyvenv re distribute tools and pip etc
 cat <<extra_info
 
-            See also a program called pyenv with your installation in /opt, 
+            See also a program called pyvenv with your installation in /opt, 
             with which you can create a virtual environment and use tools
-            such as pip, etc. See http://docs.python.org/dev/library/venv.html.
+            such as pip, etc. See the official documentation at:
+            http://docs.python.org/3.3/using/scripts.html#pyvenv-creating-virtual-environments
+
 
 extra_info
 
