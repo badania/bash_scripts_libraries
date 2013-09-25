@@ -5,43 +5,7 @@
 (( $# == 2 )) || { printf "Please provide a version branch (e.g. 3.4.0) and a version release (e.g. 3.4.0a1) in that order.\n"
                    printf "The official site is python.org, see the ftp server at: http://python.org/ftp/python.\n" >&2 ; exit 1; }
 
-# a splew of variables, so that just the version number can be given on the cmd line
-# and then then the script can do the rest, including verifying the packages using gpg
-
-# need different branch and version as sometimes the two are different, particularly for dev releases
-py_branch="$1"
-py_version="$2"
-shift 2
-
-# check if install target already exists in /opt, and exit so user can decide what to do
-if [[ -d /opt/python-${py_version} ]]; then 
-    printf "Target directory for the build already exists, please rename or remove.\n" >&2
-    exit 1
-else 
-    :
-fi
-
-# use tar.bz2 as that is what most of the older releases used, i.e. in case user tries to build an older release
-py_url="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2"
-py_asc="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2.asc"
-py_dir="$HOME/src/python_build" # checked to exist later, etc
-
-# first check if user requested file exists on server
-wget --spider ${py_url} >/dev/null 2>&1
-(( $? > 0 )) && printf "No such version, version ${py_version} does not exist\n" >&2 && exit 1
-
-
-# now very important before we do anything else, to check if asc file exists, as it doesn't for some downloads
-# if we don't check and it doesn't exist it causes the script to exit
-
-wget --spider ${py_asc} >/dev/null 2>&1
-# set a flag re whether asc file exists, so can check later and avoid problems
-(( $? > 0 )) && no_asc=1 || no_asc=0
-
-py_tarbz2="${py_url##*/}"
-(( no_asc == 0 )) && py_tarbz2_asc="${py_asc##*/}" # only set this if there is an asc file
-py_folder="${py_tarbz2%.*.*}"
-py_gpg_key="" 
+# functions
 
 # check other build dependencies are installed, beyond build-dep, sqlite support, readline, ncurses, build-essential 
 dependencies_check() {
@@ -71,6 +35,62 @@ libsqlite3-dev sqlite3 bzip2 libbz2-dev)
     fi
 
 }
+
+# gpg checking and verifying download
+
+gpg_test() {
+    
+    # if error returned, extract gpg key from error message
+    py_gpg_key="$(gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" 2>&1 | awk '{ print $NF }' | grep -v found)"
+
+    # now check with gpg_key (should be Python release signing key)
+    printf "\nReceiving keys.. "
+    gpg --recv-keys "${py_gpg_key}" >/dev/null 2>&1
+    (( $? > 0)) && printf "Key could not be received\n" || printf "Done.\n"
+
+    printf "\nVerifying download... "
+    gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" >/dev/null 2>&1
+    (( $? > 0 )) && printf "The download could not be verified.\n" || printf "Done.\n"
+
+}
+
+# check if install target already exists in /opt, and exit so user can decide what to do
+if [[ -d /opt/python-${py_version} ]]; then 
+    printf "Target directory for the build already exists, please rename or remove.\n" >&2
+    exit 1
+else 
+    :
+fi
+
+# variables
+
+# need different branch and version as sometimes the two are different, particularly for dev releases
+py_branch="$1"
+py_version="$2"
+shift 2
+
+# use tar.bz2 as that is what most of the older releases used, i.e. in case user tries to build an older release
+py_url="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2"
+py_asc="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2.asc"
+py_dir="$HOME/src/python_build" # checked to exist later, etc
+
+# first check if user requested file exists on server
+wget --spider ${py_url} >/dev/null 2>&1
+(( $? > 0 )) && printf "No such version, version ${py_version} does not exist\n" >&2 && exit 1
+
+
+# now very important before we do anything else, to check if asc file exists, as it doesn't for some downloads
+# if we don't check and it doesn't exist it causes the script to exit
+
+wget --spider ${py_asc} >/dev/null 2>&1
+# set a flag re whether asc file exists, so can check later and avoid problems
+(( $? > 0 )) && no_asc=1 || no_asc=0
+
+py_tarbz2="${py_url##*/}"
+(( no_asc == 0 )) && py_tarbz2_asc="${py_asc##*/}" # only set this if there is an asc file
+py_folder="${py_tarbz2%.*.*}"
+py_gpg_key="" 
+
 
 # tailor build-dep to new python version we want to build, basically either 2x or 3x versions
 # should work with at least lucid/precise/quantal/raring, the currently supported versions
@@ -107,24 +127,6 @@ wget "${py_url}" -P "${py_dir}" >/dev/null 2>&1
 (( $? == 0 )) && printf "Done.\n"
 # only download asc if it exists, set flag earlier
 (( no_asc == 0 )) && wget "${py_asc}" -P "${py_dir}" >/dev/null 2>&1
-
-# gpg tests
-
-gpg_test() {
-    
-    # if error returned, extract gpg key from error message
-    py_gpg_key="$(gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" 2>&1 | awk '{ print $NF }' | grep -v found)"
-
-    # now check with gpg_key (should be Python release signing key)
-    printf "\nReceiving keys.. "
-    gpg --recv-keys "${py_gpg_key}" >/dev/null 2>&1
-    (( $? > 0)) && printf "Key could not be received\n" || printf "Done.\n"
-
-    printf "\nVerifying download... "
-    gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" >/dev/null 2>&1
-    (( $? > 0 )) && printf "The download could not be verified.\n" || printf "Done.\n"
-
-}
 
 if (( no_asc == 0 )); then
     gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" >/dev/null 2>&1
