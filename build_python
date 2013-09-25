@@ -37,8 +37,6 @@ wget --spider ${py_url} >/dev/null 2>&1
 wget --spider ${py_asc} >/dev/null 2>&1
 # set a flag re whether asc file exists, so can check later and avoid problems
 (( $? > 0 )) && no_asc=1 || no_asc=0
-# remove temp folder
-[[ -d ${wget_tmp} ]] && rm -rf "${wget_tmp}"
 
 py_tarbz2="${py_url##*/}"
 (( no_asc == 0 )) && py_tarbz2_asc="${py_asc##*/}" # only set this if there is an asc file
