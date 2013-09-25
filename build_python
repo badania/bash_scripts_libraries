@@ -111,17 +111,18 @@ wget "${py_url}" -P "${py_dir}" >/dev/null 2>&1
 # gpg tests
 
 gpg_test() {
-# if error returned, extract gpg key from error message
-py_gpg_key="$(gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" 2>&1 | awk '{ print $NF }' | grep -v found)"
+    
+    # if error returned, extract gpg key from error message
+    py_gpg_key="$(gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" 2>&1 | awk '{ print $NF }' | grep -v found)"
 
-# now check with gpg_key (should be Python release signing key)
-printf "\nReceiving keys.. "
-gpg --recv-keys "${py_gpg_key}" >/dev/null 2>&1
-(( $? > 0)) && printf "Key could not be received\n" || printf "Done.\n"
+    # now check with gpg_key (should be Python release signing key)
+    printf "\nReceiving keys.. "
+    gpg --recv-keys "${py_gpg_key}" >/dev/null 2>&1
+    (( $? > 0)) && printf "Key could not be received\n" || printf "Done.\n"
 
-printf "\nVerifying download... "
-gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" >/dev/null 2>&1
-(( $? > 0 )) && printf "The download could not be verified.\n" || printf "Done.\n"
+    printf "\nVerifying download... "
+    gpg --verify "${py_tarbz2_asc}" "${py_tarbz2}" >/dev/null 2>&1
+    (( $? > 0 )) && printf "The download could not be verified.\n" || printf "Done.\n"
 
 }
 
