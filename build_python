@@ -26,12 +26,15 @@ py_url="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2"
 py_asc="http://python.org/ftp/python/${py_branch}/Python-${py_version}.tar.bz2.asc"
 py_dir="$HOME/src/python_build" # checked to exist later, etc
 
+# first check if user requested file exists on server
+wget --spider ${py_url} >/dev/null 2>&1
+(( $? > 0 )) && printf "No such version, version ${py_version} does not exist\n" >&2 && exit 1
+
+
 # now very important before we do anything else, to check if asc file exists, as it doesn't for some downloads
 # if we don't check and it doesn't exist it causes the script to exit
 
-export TMPDIR="$HOME"
-wget_tmp="$(mktemp -d --suffix _$$)"
-wget ${py_asc} -P "${wget_tmp}" >/dev/null 2>&1
+wget --spider ${py_asc} >/dev/null 2>&1
 # set a flag re whether asc file exists, so can check later and avoid problems
 (( $? > 0 )) && no_asc=1 || no_asc=0
 # remove temp folder
