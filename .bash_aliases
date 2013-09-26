@@ -16,6 +16,7 @@ alias l='ls -CF'
 
 # various program aliases, mostly self explanatory
 
+alias py33='source Py3_3_env/bin/activate'
 alias geany='setsid geany'
 # change make alias acording to cpu cores/threads plus one. So Pentium 4 (no hyperthreading): 1+1=2) 
 alias make='make -j2'
@@ -46,6 +47,10 @@ alias uppies='sudo apt-get update && sudo apt-get upgrade -uV'
 # check apparmour
 alias mikaa="sudo aa-status"
 
+# alternative nasa streams, see also functions in bashlib
+
+alias nasatv='vlc "http://iphone-streaming.ustream.tv/ustreamVideo/6540154/streams/live/playlist.m3u8"'
+
 # network activity
 alias net1='netstat -tupan'
 alias netcon='sudo lsof -n -i4 -P'
@@ -64,3 +69,4 @@ alias normalhosts='sudo cp -f /root/backups/hosts/normal_hosts/hosts /etc'
 alias specialhosts='sudo cp -f /root/backups/hosts/special_hosts/hosts /etc'
 
 #### functions have already been sourced from my Bash library file ####
+

@@ -55,7 +55,8 @@ PS1="\[\033[0;31m\]duke@nukem \w\\$\[\033[0m\] "
 export EDITOR GPGKEY PS1 PAGER 
 
 
-# set commands -see $SHELLOPTS and $-
+# set commands -see $SHELLOPTS and $- and set +o or set -o, which will list them free of any other
+# extraneous stuff that can be printed with set if bash_completion is enabled
 # noclobber-can be overriden with >|
 set -o noclobber
 # switch off hashing, often causes problems when on
@@ -94,7 +95,7 @@ HISTCONTROL="ignoreboth:erasedups"
 
 HISTSIZE=5000
 HISTTIMEFORMAT="%F %H_%M_%S "
-HISTIGNORE="&:cd:[bf]g:history:exit:man:help:info:ls:clear"
+HISTIGNORE="&:[bf]g:history*:exit:man*:help*:info*:ls*:clear"
 
 # special TERMCAP specs 
 
